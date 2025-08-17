@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "es2020", // compatible Node 14+
+    "module": "commonjs", // plus simple pour Node + Express
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true, // permet import express from "express"
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true
+  },
+  "include": [
+    "src/**/*"
+  ]
+}
