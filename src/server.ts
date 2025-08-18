@@ -2,17 +2,25 @@ import express from "express";
 import cors from "cors";
 import { spawn } from "child_process";
 import { join } from "path";
+import { connectDB, positions, users } from "./db"; // 🔗 MongoDB
+
+type FeuilleProps = {
+    fen: string;
+    commentaire: string;
+    childs: string[];
+};
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/analyse", (req, res) => {
+// ------------------- API Analyse avec Stockfish -------------------
+app.post("/analyse", async (req, res) => {
     const { fen, depth } = req.body;
     const engine = spawn(join(__dirname, "../public/stockfish.exe"));
 
     let output = "";
-    engine.stdout.on("data", (data) => {
+    engine.stdout.on("data", async (data) => {
         output += data.toString();
 
         if (output.includes("bestmove")) {
@@ -22,12 +30,44 @@ app.post("/analyse", (req, res) => {
 
             engine.kill();
 
-            res.json({
+            const trait = fen.split(" ")[1]; // "w" ou "b"
+
+            let score = matchCp ? parseInt(matchCp[1], 10) : 50;
+            let mate = matchMate ? parseInt(matchMate[1], 10) : null;
+
+            if (mate !== null) {
+                if (mate > 0) {
+                    score = trait === "w" ? 1000 : -1000;
+                } else {
+                    score = trait === "w" ? -1000 : 1000;
+                }
+            } else {
+                score = trait === "b" ? -score : score;
+            }
+
+            const normalizedScore = mate !== null
+                ? Math.max(0, Math.min(100, (score >= 0 ? score : 0) / 10))
+                : Math.max(5, Math.min(95, ((score / 100) + 4) / 8 * 100));
+
+            const result = {
+                fen,
                 bestmove: matchMove ? matchMove[1] : null,
-                score: matchCp ? parseInt(matchCp[1], 10) : null,
-                mate: matchMate ? parseInt(matchMate[1], 10) : null,
-            });
-            console.log(matchMate);
+                score: normalizedScore,
+                mate: mate,
+                depth: depth || 15,
+            };
+
+            // 🔥 Sauvegarde dans Mongo avec compteur
+            await positions.updateOne(
+                { fen },
+                {
+                    $set: result,
+                    $inc: { playCount: 1 } // incrémente playCount
+                },
+                { upsert: true }
+            );
+
+            res.json(result);
         }
     });
 
@@ -37,4 +77,48 @@ app.post("/analyse", (req, res) => {
     engine.stdin.write(`go depth ${depth || 15}\n`);
 });
 
-app.listen(4000, () => console.log("API Stockfish sur http://localhost:4000"));
+// ------------------- API Utilisateurs -------------------
+
+// Créer un utilisateur
+app.post("/users", async (req, res) => {
+    const { username, email } = req.body;
+    const tree = new Map();
+    console.log("Création de l'utilisateur :", username, email);
+    tree.set("root", {
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      // position initiale
+        commentaire: "",
+        childs: [],
+    } as FeuilleProps);
+    const user = {
+        username,
+        email,
+        createdAt: new Date(),
+        tree: tree,
+    };
+    console.log("Nouvel utilisateur :", user);
+    const result = await users.insertOne(user);
+    res.json(result);
+});
+
+// Récupérer tous les utilisateurs
+app.get("/users", async (req, res) => {
+    const allUsers = await users.find().toArray();
+    res.json(allUsers);
+});
+
+// ------------------- API Récupération Positions -------------------
+app.get("/positions", async (req, res) => {
+    const all = await positions.find().toArray();
+    res.json(all);
+});
+
+app.get("/position/:fen", async (req, res) => {
+    const pos = await positions.findOne({ fen: req.params.fen });
+    res.json(pos);
+});
+
+// ------------------- Lancement serveur -------------------
+app.listen(4000, async () => {
+    await connectDB(); // 🔗 connexion Mongo au lancement
+    console.log("🚀 API Stockfish sur http://localhost:4000");
+});

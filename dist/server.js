@@ -7,26 +7,52 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const child_process_1 = require("child_process");
 const path_1 = require("path");
+const db_1 = require("./db"); // 🔗 MongoDB
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
-app.post("/analyse", (req, res) => {
+// ------------------- API Analyse avec Stockfish -------------------
+app.post("/analyse", async (req, res) => {
     const { fen, depth } = req.body;
     const engine = (0, child_process_1.spawn)((0, path_1.join)(__dirname, "../public/stockfish.exe"));
     let output = "";
-    engine.stdout.on("data", (data) => {
+    engine.stdout.on("data", async (data) => {
         output += data.toString();
         if (output.includes("bestmove")) {
             const matchMove = output.match(/bestmove\s+(\S+)/);
             const matchCp = output.match(/score\s+cp\s+(-?\d+)/);
             const matchMate = output.match(/score\s+mate\s+(-?\d+)/);
             engine.kill();
-            res.json({
+            const trait = fen.split(" ")[1]; // "w" ou "b"
+            let score = matchCp ? parseInt(matchCp[1], 10) : 50;
+            let mate = matchMate ? parseInt(matchMate[1], 10) : null;
+            if (mate !== null) {
+                if (mate > 0) {
+                    score = trait === "w" ? 1000 : -1000;
+                }
+                else {
+                    score = trait === "w" ? -1000 : 1000;
+                }
+            }
+            else {
+                score = trait === "b" ? -score : score;
+            }
+            const normalizedScore = mate !== null
+                ? Math.max(0, Math.min(100, (score >= 0 ? score : 0) / 10))
+                : Math.max(5, Math.min(95, ((score / 100) + 4) / 8 * 100));
+            const result = {
+                fen,
                 bestmove: matchMove ? matchMove[1] : null,
-                score: matchCp ? parseInt(matchCp[1], 10) : null,
-                mate: matchMate ? parseInt(matchMate[1], 10) : null,
-            });
-            console.log(matchMate);
+                score: normalizedScore,
+                mate: mate,
+                depth: depth || 15,
+            };
+            // 🔥 Sauvegarde dans Mongo avec compteur
+            await db_1.positions.updateOne({ fen }, {
+                $set: result,
+                $inc: { playCount: 1 } // incrémente playCount
+            }, { upsert: true });
+            res.json(result);
         }
     });
     engine.stdin.write("uci\n");
@@ -34,5 +60,44 @@ app.post("/analyse", (req, res) => {
     engine.stdin.write(`position fen ${fen}\n`);
     engine.stdin.write(`go depth ${depth || 15}\n`);
 });
-app.listen(4000, () => console.log("API Stockfish sur http://localhost:4000"));
+// ------------------- API Utilisateurs -------------------
+// Créer un utilisateur
+app.post("/users", async (req, res) => {
+    const { username, email } = req.body;
+    const tree = new Map();
+    console.log("Création de l'utilisateur :", username, email);
+    tree.set("root", {
+        fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", // position initiale
+        commentaire: "",
+        childs: [],
+    });
+    const user = {
+        username,
+        email,
+        createdAt: new Date(),
+        tree: tree,
+    };
+    console.log("Nouvel utilisateur :", user);
+    const result = await db_1.users.insertOne(user);
+    res.json(result);
+});
+// Récupérer tous les utilisateurs
+app.get("/users", async (req, res) => {
+    const allUsers = await db_1.users.find().toArray();
+    res.json(allUsers);
+});
+// ------------------- API Récupération Positions -------------------
+app.get("/positions", async (req, res) => {
+    const all = await db_1.positions.find().toArray();
+    res.json(all);
+});
+app.get("/position/:fen", async (req, res) => {
+    const pos = await db_1.positions.findOne({ fen: req.params.fen });
+    res.json(pos);
+});
+// ------------------- Lancement serveur -------------------
+app.listen(4000, async () => {
+    await (0, db_1.connectDB)(); // 🔗 connexion Mongo au lancement
+    console.log("🚀 API Stockfish sur http://localhost:4000");
+});
 //# sourceMappingURL=server.js.map
