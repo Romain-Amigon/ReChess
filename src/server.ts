@@ -79,6 +79,7 @@ app.post("/analyse", async (req, res) => {
 
 // ------------------- API Utilisateurs -------------------
 
+
 // Créer un utilisateur
 app.post("/users", async (req, res) => {
     const { username, email } = req.body;
@@ -100,6 +101,37 @@ app.post("/users", async (req, res) => {
     res.json(result);
 });
 
+// Récupérer un utilisateur par son username
+app.get("/users/:username", async (req, res) => {
+    try {
+        const user = await users.findOne({ username: req.params.username });
+        if (!user) {
+            return res.status(404).json({ error: "Utilisateur introuvable" });
+        }
+        res.json(user);
+    } catch (err) {
+        console.error("❌ Erreur récupération utilisateur :", err);
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// Récupérer une position par son FEN
+app.get("/positions/:fen", async (req, res) => {
+    try {
+        const fen = decodeURIComponent(req.params.fen);
+        console.log("Recherche position FEN :", fen);
+        const pos = await users.findOne({ fen: fen });
+        if (!pos) {
+            return res.status(404).json({ error: "position introuvable" });
+        }
+        res.json(pos);
+    } catch (err) {
+        console.error("❌ Erreur récupération position :", err);
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+
 // Récupérer tous les utilisateurs
 app.get("/users", async (req, res) => {
     const allUsers = await users.find().toArray();
@@ -112,10 +144,6 @@ app.get("/positions", async (req, res) => {
     res.json(all);
 });
 
-app.get("/position/:fen", async (req, res) => {
-    const pos = await positions.findOne({ fen: req.params.fen });
-    res.json(pos);
-});
 
 // ------------------- Lancement serveur -------------------
 app.listen(4000, async () => {

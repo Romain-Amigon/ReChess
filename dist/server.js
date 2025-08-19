@@ -81,6 +81,36 @@ app.post("/users", async (req, res) => {
     const result = await db_1.users.insertOne(user);
     res.json(result);
 });
+// Récupérer un utilisateur par son username
+app.get("/users/:username", async (req, res) => {
+    try {
+        const user = await db_1.users.findOne({ username: req.params.username });
+        if (!user) {
+            return res.status(404).json({ error: "Utilisateur introuvable" });
+        }
+        res.json(user);
+    }
+    catch (err) {
+        console.error("❌ Erreur récupération utilisateur :", err);
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+// Récupérer une position par son FEN
+app.get("/positions/:fen", async (req, res) => {
+    try {
+        const fen = decodeURIComponent(req.params.fen);
+        console.log("Recherche position FEN :", fen);
+        const pos = await db_1.users.findOne({ fen: fen });
+        if (!pos) {
+            return res.status(404).json({ error: "position introuvable" });
+        }
+        res.json(pos);
+    }
+    catch (err) {
+        console.error("❌ Erreur récupération position :", err);
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
 // Récupérer tous les utilisateurs
 app.get("/users", async (req, res) => {
     const allUsers = await db_1.users.find().toArray();
@@ -90,10 +120,6 @@ app.get("/users", async (req, res) => {
 app.get("/positions", async (req, res) => {
     const all = await db_1.positions.find().toArray();
     res.json(all);
-});
-app.get("/position/:fen", async (req, res) => {
-    const pos = await db_1.positions.findOne({ fen: req.params.fen });
-    res.json(pos);
 });
 // ------------------- Lancement serveur -------------------
 app.listen(4000, async () => {
