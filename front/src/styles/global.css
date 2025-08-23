@@ -1,0 +1,100 @@
+.chess-bg {
+    display: flex;
+    flex-direction: column;
+    /* important pour align-items gérer l'horizontal */
+    align-items: center;
+    /* centre horizontalement */
+    justify-content: flex-start;
+    /* contenu en haut */
+    padding-top: 32px;
+    min-height: 100vh;
+}
+
+
+
+.chess-container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 480px;
+    width: 100%;
+    position: relative;
+    /* Point de référence pour l’historique */
+    display: inline-block;
+    /* S'adapte à la taille de l’échiquier */
+}
+
+.historique {
+    position: absolute;
+    top: 100px;
+    right: 5%;
+    /* Collé juste à droite de l’échiquier */
+    margin-left: 32px;
+    /* Espace entre l'échiquier et l’historique */
+    min-width: 200px;
+    max-width: 240px;
+    background: #f5f5f5;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.chess-title {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #2d3a4b;
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.chessboard-wrapper {
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(44, 62, 80, 0.08);
+}
+
+.chess-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.chess-btn {
+    background: linear-gradient(90deg, #6dd5ed 0%, #2193b0 100%);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(44, 62, 80, 0.08);
+    transition: background 0.2s;
+}
+
+.chess-btn:hover {
+    background: linear-gradient(90deg, #2193b0 0%, #6dd5ed 100%);
+}
+
+.king-in-check {
+    transition: transform 0.4s;
+    transform: rotate(-90deg);
+}
+
+
+.chess-bg,
+.chess-container,
+.chessboard-wrapper,
+.chess-title,
+.chess-btn,
+textarea,
+button,
+h3,
+ol,
+li,
+span {
+    position: relative;
+}
