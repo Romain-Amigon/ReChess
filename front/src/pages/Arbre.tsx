@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Chessboard } from "react-chessboard";
 import { useUser } from "../code/userContext";
 import Bar from "../code/EvaluationBar";
 import { Chess } from "chess.js";
 import type { PieceDropHandlerArgs } from "react-chessboard";
 import Echiquier from "../code/echiquier";
+
 
 type TreeNode = {
     fen: string;
@@ -23,21 +24,52 @@ type Position = {
     depth: number;
 };
 
-function TreeNodeComponent({
-    nodeKey,
-    node,
-    tree,
-    openModal,  // 👈 on ajoute la prop ici
-    updateComment,
-}: {
+type TreeNodeProps = {
     nodeKey: number;
     node: TreeNode;
     tree: TreeMap;
     openModal: (parentKey: number, parentFen: string) => void;
     updateComment?: (nodeKey: number, newComment: string) => void;
-}) {
+    ischild: boolean;
+    registerRect?: (rect: DOMRect) => void; // 👈 callback vers le parent
+};
+
+function CurveLine({ from, to }: { from: DOMRect; to: DOMRect }) {
+    const x1 = from.right; // côté droit du parent
+    const y1 = from.top + from.height / 2;
+    const x2 = to.left; // côté gauche de l’enfant
+    const y2 = to.top + to.height / 2;
+    console.log("Drawing line from", { x1, y1 }, "to", { to, x2, y2 });
+    const midX = (x1 + x2) / 2;
+    const pathData = `M ${x1},${y1} C ${midX},${y1} ${midX},${y2} ${x2},${y2}`;
+
+    return <path d={pathData} stroke="black" strokeWidth={2} fill="none" />;
+}
+
+function TreeNodeComponent({
+    nodeKey,
+    node,
+    tree,
+    openModal,
+    updateComment,
+    ischild,
+    registerRect,
+}: TreeNodeProps) {
     const [pos, setPos] = useState<Position | null>(null);
     const [comment, setComment] = useState(node.commentaire);
+
+    const nodeRef = useRef<HTMLDivElement>(null);
+    const [childRects, setChildRects] = useState<DOMRect[]>([]);
+    const [parentRect, setParentRect] = useState<DOMRect | null>(null);
+
+    useEffect(() => {
+        if (nodeRef.current) {
+            const rect = nodeRef.current.getBoundingClientRect();
+            setParentRect(rect);
+            // informer le parent si besoin
+            if (registerRect) registerRect(rect);
+        }
+    }, [nodeRef.current]);
 
     useEffect(() => {
         (async () => {
@@ -64,84 +96,121 @@ function TreeNodeComponent({
     };
 
     return (
-        <div key={nodeKey} style={{ marginBottom: "20px" }}>
-            <div
-                style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: "10px",
-                }}
-            >
-                <h3 style={{ margin: 0 }}>{nodeKey}</h3>
-
-                <div style={{ width: 200, height: 200 }}>
-                    <Chessboard options={{ position: node.fen }} />
-                </div>
-
+        <div style={{ marginBottom: "20px", display: "flex", flexDirection: "row", alignItems: "center" }}>
+            {/* Bloc du noeud */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <div
+                    ref={nodeRef}
                     style={{
-                        width: 80,
-                        height: 200,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        display: "flex", flexDirection: "row", alignItems: "center", gap: "10px",
                     }}
                 >
-                    {pos ? (
-                        <Bar score={pos.score} width={40} height={150} />
-                    ) : (
-                        <p>⏳...</p>
-                    )}
+                    <h3 style={{ margin: 0 }}>{nodeKey}</h3>
+
+                    <div style={{ width: 200, height: 200, marginLeft: 10 }}>
+                        <Chessboard options={{ position: node.fen }} />
+                    </div>
+
+                    <div
+                        style={{
+                            width: 80,
+                            height: 200,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginLeft: 10,
+                        }}
+                    >
+                        {pos ? (
+                            <Bar score={pos.score} width={40} height={150} />
+                        ) : (
+                            <p>⏳...</p>
+                        )}
+                    </div>
+
+                    <button
+                        onClick={() => openModal(nodeKey, node.fen)}
+                        style={{ padding: "5px 10px", cursor: "pointer", marginLeft: 10 }}
+                    >
+                        +
+                    </button>
                 </div>
 
-                <button
-                    onClick={() => openModal(nodeKey, node.fen)} // 👈 fix ici
-                    style={{ padding: "5px 10px", cursor: "pointer" }}
-                >
-                    +
-                </button>
+                <div style={{ marginBottom: "10px" }}>
+                    <textarea
+                        value={comment}
+                        onChange={handleCommentChange}
+                        placeholder="Ajouter un commentaire..."
+                        style={{
+                            width: "100%",
+                            maxWidth: "480px",
+                            minHeight: "60px",
+                            padding: "5px",
+                        }}
+                    />
+                </div>
             </div>
-            <div style={{ marginTop: "10px" }}>
-                <textarea
-                    value={comment}
-                    onChange={handleCommentChange}
-                    placeholder="Ajouter un commentaire..."
-                    style={{
-                        width: "100%",
-                        maxWidth: "480px",
-                        minHeight: "60px",
-                        padding: "5px",
-                    }}
-                />
-            </div>
+            {/* Rendu des enfants */}
+            {
+                !ischild && (
+                    <div
+                        style={{
+                            display: "flex", flexDirection: "column", alignItems: "center", marginLeft: "100px",
+                        }}
+                    >
+                        {node.childs.map((childKey) => {
+                            const child = tree.get(childKey);
+                            return child ? (
+                                <TreeNodeComponent
+                                    key={childKey}
+                                    nodeKey={childKey}
+                                    node={child}
+                                    tree={tree}
+                                    openModal={openModal}
+                                    updateComment={updateComment}
+                                    ischild={true}
+                                    registerRect={(rect) =>
+                                        setChildRects((prev) => [...prev, rect])
+                                    }
+                                />
+                            ) : null;
+                        })}
+                    </div>
+                )
+            }
 
-            <div style={{ marginTop: "20px" }}>
-                {node.childs.map((childKey) => {
-                    const child = tree.get(childKey);
-                    return child ? (
-                        <TreeNodeComponent
-                            key={childKey}
-                            nodeKey={childKey}
-                            node={child}
-                            tree={tree}
-                            openModal={openModal} // 👈 on redescend la prop
-                            updateComment={updateComment}
-                        />
-                    ) : null;
-                })}
-            </div>
-        </div>
+            {/* SVG pour les lignes */}
+            {
+                parentRect && childRects.length > 0 && (
+                    <svg
+                        style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: "100%",
+                            height: "20000%",
+                            zIndex: 0,
+                            pointerEvents: "none",
+                        }}
+                    >
+                        {childRects.map((rect, idx) => (
+                            <CurveLine key={idx} from={parentRect} to={rect} />
+                        ))}
+                    </svg>
+                )
+            }
+        </div >
     );
 }
 
 export default function Arbre() {
-    const { user } = useUser();
+    const { user, updateUser } = useUser();
     const [userTree, setUserTree] = useState<TreeMap>(new Map());
     const [modalOpen, setModalOpen] = useState(false);
     const [modalParent, setModalParent] = useState<number | null>(null);
     const [chess, setChess] = useState<any>(new Chess());
     const [fen, setFen] = useState("start");
+    const [currentNodeKey, setCurrentNodeKey] = useState<number>(0);
 
     useEffect(() => {
         if (user?.tree) {
@@ -152,6 +221,30 @@ export default function Arbre() {
         }
     }, [user]);
 
+    // Fonction pour synchroniser l'arbre avec le serveur
+    const syncTreeWithServer = async (updatedTree: TreeMap) => {
+        if (!user) return;
+
+        try {
+            const response = await fetch(`http://localhost:4000/users/${user.username}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ tree: Object.fromEntries(updatedTree) }), // Convertir Map en objet
+            });
+
+            if (!response.ok) {
+                throw new Error("Erreur lors de la mise à jour de l'arbre sur le serveur");
+            }
+
+            const updatedUser = await response.json();
+            // Mettre à jour l'utilisateur dans le contexte
+            updateUser(updatedUser); // Assurez-vous que setUser est accessible (voir Étape 3)
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+            console.log("Arbre synchronisé avec le serveur :", updatedTree);
+        } catch (error) {
+            console.error("Erreur lors de la synchronisation de l'arbre :", error);
+        }
+    };
 
     const openModal = (parentKey: number, parentFen: string) => {
         const game = new Chess(parentFen);
@@ -167,9 +260,8 @@ export default function Arbre() {
         setModalParent(null);
     };
 
-
     const handleDrop = ({ sourceSquare, targetSquare, piece }: PieceDropHandlerArgs): boolean => {
-        if (!targetSquare) return false; // si on lâche hors de l’échiquier
+        if (!targetSquare) return false;
 
         const gameCopy = new Chess(chess.fen());
         const move = gameCopy.move({
@@ -187,10 +279,7 @@ export default function Arbre() {
         return false;
     };
 
-
-
-
-    const validateMove = () => {
+    const validateMove = async () => {
         if (modalParent == null) return;
 
         const newKey = Math.max(...Array.from(userTree.keys())) + 1;
@@ -198,10 +287,27 @@ export default function Arbre() {
         if (!parentNode) return;
 
         const newNode: TreeNode = {
-            fen: fen, // utiliser la FEN actuelle de la modal
+            fen: fen,
             commentaire: "",
             childs: [],
         };
+
+        try {
+            const res = await fetch(`http://localhost:4000/positions/${encodeURIComponent(fen)}`);
+            if (!res.ok) {
+                await fetch("http://localhost:4000/analyse", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ fen, depth: 15 }),
+                });
+                console.log("Position analysée et insérée :", fen);
+            } else {
+                console.log("Position déjà présente dans la BDD :", fen);
+            }
+        } catch (e) {
+            console.error("Erreur lors de la vérification ou analyse de la position :", e);
+            return;
+        }
 
         const updatedTree = new Map(userTree);
         updatedTree.set(newKey, newNode);
@@ -209,47 +315,11 @@ export default function Arbre() {
         updatedTree.set(modalParent, parentNode);
         setUserTree(updatedTree);
 
-
-        const analyze = async (fen: string, depth: number) => {
-            try {
-                const res = await fetch("http://localhost:4000/analyse", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ fen, depth }),
-                });
-                const data = await res.json();
-
-            } catch (err) {
-                console.error(err);
-            }
-        };
-        // Vérifier si FEN existe dans la BDD, sinon créer la position pour la barre
-        (async () => {
-            try {
-                const res = await fetch(`http://localhost:4000/positions/${encodeURIComponent(fen)}`);
-                if (!res.ok) {
-                    await fetch(`http://localhost:4000/positions`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            fen: fen,
-                            score: 0,
-                            mate: null,
-                            bestmove: null,
-                            playCount: 0,
-                            depth: 0
-                        }),
-                    });
-                    console.log("Position créée dans la BDD :", fen);
-                }
-            } catch (e) {
-                console.error("Erreur lors de la création de la position :", e);
-            }
-        })();
+        // Synchroniser l'arbre avec le serveur
+        await syncTreeWithServer(updatedTree);
 
         closeModal();
     };
-
 
     const updateComment = (nodeKey: number, newComment: string) => {
         const updatedTree = new Map(userTree);
@@ -258,6 +328,9 @@ export default function Arbre() {
             node.commentaire = newComment;
             updatedTree.set(nodeKey, node);
             setUserTree(updatedTree);
+
+            // Synchroniser l'arbre avec le serveur
+            syncTreeWithServer(updatedTree);
         }
     };
 
@@ -269,19 +342,19 @@ export default function Arbre() {
                     <p>{user.email}</p>
                     <div>
                         <h3>Votre arbre de parties :</h3>
+
                         {userTree.size > 0 ? (
-                            Array.from(userTree.entries()).map(([key, node]) =>
-                                key === 0 ? (
-                                    <TreeNodeComponent
-                                        key={key}
-                                        nodeKey={key}
-                                        node={node}
-                                        tree={userTree}
-                                        openModal={openModal}
-                                        updateComment={updateComment}
-                                    />
-                                ) : null
-                            )
+
+                            <TreeNodeComponent
+                                key={currentNodeKey}
+                                nodeKey={currentNodeKey}
+                                node={userTree.get(currentNodeKey)!}
+                                tree={userTree}
+                                openModal={openModal}
+                                updateComment={updateComment}
+                                ischild={false}
+                            />
+
                         ) : (
                             <p>Aucun arbre trouvé.</p>
                         )}

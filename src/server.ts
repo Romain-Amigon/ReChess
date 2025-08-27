@@ -120,6 +120,33 @@ app.get("/users/:username", async (req, res) => {
     }
 });
 
+// Mettre à jour l'arbre d'un utilisateur
+app.patch("/users/:username", async (req, res) => {
+    try {
+        const { username } = req.params;
+        const { tree } = req.body;
+
+        if (!tree || typeof tree !== "object") {
+            return res.status(400).json({ error: "Arbre invalide" });
+        }
+
+        const updatedUser = await users.findOneAndUpdate(
+            { username },
+            { $set: { tree } },
+            { returnDocument: 'after' } // Use returnDocument: 'after' instead of new: true
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ error: "Utilisateur introuvable" });
+        }
+
+        res.json(updatedUser);
+    } catch (err) {
+        console.error("❌ Erreur mise à jour utilisateur :", err);
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
 // Récupérer une position par son FEN
 app.get("/positions/:fen", async (req, res) => {
     console.log("e", req.params.fen, 'e');

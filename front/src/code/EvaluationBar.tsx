@@ -39,12 +39,7 @@ const Bar: React.FC<BarProps> = (props) => {
         }
     };
 
-    // ⚡ Mode analyse uniquement si pas de score fourni
-    useEffect(() => {
-        if ("fen" in props && props.fen && props.depth) {
-            analyze(props.fen, props.depth);
-        }
-    }, [props.fen, props.depth]);
+
 
 
     const Nscore = score !== null
@@ -102,4 +97,4 @@ const Bar: React.FC<BarProps> = (props) => {
     );
 };
 
-export default Bar;
+export default React.memo(Bar);

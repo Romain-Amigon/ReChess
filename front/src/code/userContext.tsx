@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-
 interface User {
   username: string;
   email: string;
@@ -11,6 +10,7 @@ interface UserContextType {
   login: (username: string) => Promise<void>;
   register: (username: string, email: string) => Promise<void>;
   logout: () => void;
+  updateUser: (updatedUser: User) => void; // Nouvelle fonction
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -18,7 +18,6 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  // charger depuis localStorage
   useEffect(() => {
     const saved = localStorage.getItem("user");
     if (saved) setUser(JSON.parse(saved));
@@ -49,8 +48,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem("user");
   };
 
+  const updateUser = (updatedUser: User) => {
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+  };
+
   return (
-    <UserContext.Provider value={{ user, login, register, logout }}>
+    <UserContext.Provider value={{ user, login, register, logout, updateUser }}>
       {children}
     </UserContext.Provider>
   );
