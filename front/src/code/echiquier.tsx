@@ -13,7 +13,7 @@ type EchiquierProps = {
 
 
 const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
-    console.log("Echiquier position:", position);
+    // console.log("Echiquier position:", position);
     // create a chess game using a ref to always have access to the latest game state within closures and maintain the game state across renders
     const chessGameRef = useRef(new Chess(position));
     const chessGame = chessGameRef.current;
@@ -32,6 +32,7 @@ const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
     function handleMove(coup: Coup) {
         setCoup(coup); // ton état interne si besoin
         // peut-être update le parent ici
+        //console.log("handleMove", coup);
         if (onMove) onMove(coup);
     }
 
@@ -123,14 +124,6 @@ const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
 
 
 
-        const newCoup = {
-            from: moveFrom,
-            to: square,
-            piece: chessGame.get(moveFrom as Square)?.type || '',
-        } as Coup;
-        chessGame.move({ from: moveFrom, to: square });
-        setChessPosition(chessGame.fen());
-        handleMove(newCoup);
 
         const movingPiece = chessGame.get(moveFrom as Square);
         const isWhitePromotion = movingPiece?.type === 'p' && movingPiece?.color === 'w' && square[1] === '8';
@@ -160,7 +153,13 @@ const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
         }
 
         // update the position state
+        const newCoup = {
+            from: moveFrom,
+            to: square,
+            piece: chessGame.get(square as Square)?.type || '',
+        } as Coup;
         setChessPosition(chessGame.fen());
+        handleMove(newCoup);
 
 
         // clear moveFrom and optionSquares
@@ -197,20 +196,18 @@ const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
             });
 
             // update the position state upon successful move to trigger a re-render of the chessboard
-            setChessPosition(chessGame.fen());
-            const newCoup = {
-                from: sourceSquare,
-                to: targetSquare,
-                piece: chessGame.get(sourceSquare as Square)?.type || '',
-            } as Coup;
-            chessGame.move({ from: moveFrom, to: targetSquare });
-            setChessPosition(chessGame.fen());
-            handleMove(newCoup);
+
             // clear moveFrom and optionSquares
             setMoveFrom('');
             setOptionSquares({});
 
-
+            const newCoup = {
+                from: sourceSquare,
+                to: targetSquare,
+                piece: chessGame.get(targetSquare as Square)?.type || '',
+            } as Coup;
+            setChessPosition(chessGame.fen());
+            handleMove(newCoup);
             // return true as the move was successful
             return true;
         } catch {
@@ -268,10 +265,6 @@ const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
             setCheckKingSquare('');
         }
     }, [chessPosition]);
-    useEffect(() => {
-        console.log("Nouvelle valeur de checkKingSquare :", checkKingSquare);
-    }, [checkKingSquare]);
-
 
 
     const customSquareStyles = checkKingSquare
@@ -290,54 +283,52 @@ const Echiquier: React.FC<EchiquierProps> = ({ position, onMove }) => {
         onSquareClick,
         position: chessPosition,
         squareStyles: { ...optionSquares, ...customSquareStyles },
-        id: 'click-or-drag-to-move',
+
 
     };
 
     // render the chessboard
     return (
         <div className="chess-bg">
-            <div className="chess-container">
-                <div className="chessboard-wrapper" style={{ width: 400, height: 400 }}>
-                    <Chessboard
-                        options={chessboardOptions}
-                    />
-                </div>
-                {/* Modale de promotion */}
-                {promotionMove && (
+            <div className="chessboard-wrapper" style={{ width: 400, height: 400 }}>
+                <Chessboard
+                    options={chessboardOptions}
+                />
+            </div>
+            {/* Modale de promotion */}
+            {promotionMove && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        background: "rgba(0,0,0,0.3)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        zIndex: 1000,
+                    }}
+                >
                     <div
                         style={{
-                            position: "fixed",
-                            top: 0, left: 0, right: 0, bottom: 0,
-                            background: "rgba(0,0,0,0.3)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            zIndex: 1000,
+                            background: "#fff",
+                            borderRadius: 12,
+                            padding: 24,
+                            boxShadow: "0 4px 16px rgba(44,62,80,0.12)",
+                            display: "flex",
+                            gap: 24,
                         }}
                     >
-                        <div
-                            style={{
-                                background: "#fff",
-                                borderRadius: 12,
-                                padding: 24,
-                                boxShadow: "0 4px 16px rgba(44,62,80,0.12)",
-                                display: "flex",
-                                gap: 24,
-                            }}
-                        >
-                            {PROMOTION_PIECES.map(piece => (
-                                <button
-                                    key={piece}
-                                    className="chess-btn"
-                                    style={{ fontSize: "2rem" }}
-                                    onClick={() => onPromotionPieceSelect(piece)}
-                                >
-                                    {piece === "q" ? "♕" : piece === "r" ? "♖" : piece === "b" ? "♗" : "♘"}
-                                </button>
-                            ))}
-                        </div>
+                        {PROMOTION_PIECES.map(piece => (
+                            <button
+                                key={piece}
+                                className="chess-btn"
+                                style={{ fontSize: "2rem" }}
+                                onClick={() => onPromotionPieceSelect(piece)}
+                            >
+                                {piece === "q" ? "♕" : piece === "r" ? "♖" : piece === "b" ? "♗" : "♘"}
+                            </button>
+                        ))}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from "react";
 
 type BarProps =
-    | { fen: string; depth: number; score?: undefined }  // mode analyse
-    | { score: number; fen?: undefined; depth?: undefined }; // mode score direct
+    | { fen: string; depth: number; score?: undefined; width?: number; height?: number }  // mode analyse
+    | { score: number; fen?: undefined; depth?: undefined; width?: number; height?: number }; // mode score direct
 
 const Bar: React.FC<BarProps> = (props) => {
+    console.log("creation Bar", props);
     const [bestMove, setBestMove] = useState<string | null>(null);
     const [score, setScore] = useState<number | null>(
         "score" in props && props.score !== undefined ? props.score : null
     );
     const [mate, setMate] = useState<number | null>(null);
+    const trait = props.fen ? props.fen.split(" ")[1] : "w"; // par défaut blanc
+    const barWidth = props.width ?? 40;   // largeur personnalisable
+    const barHeight = props.height ?? 300; // hauteur personnalisable
 
     const analyze = async (fen: string, depth: number) => {
         try {
@@ -27,7 +31,8 @@ const Bar: React.FC<BarProps> = (props) => {
                 setScore(trait === "w" ? 1000 : -1000);
             } else {
                 setMate(null);
-                setScore(trait === "b" ? -data.score : data.score);
+                //setScore(trait === "b" ? -data.score : data.score);
+                setScore(data.score);
             }
         } catch (err) {
             console.error(err);
@@ -39,14 +44,19 @@ const Bar: React.FC<BarProps> = (props) => {
         if ("fen" in props && props.fen && props.depth) {
             analyze(props.fen, props.depth);
         }
-    }, [props]);
+    }, [props.fen, props.depth]);
+
+
+    const Nscore = score !== null
+        ? (score) / 100
+        : (mate !== null) ? mate : 0;
 
     const normalizedScore = score !== null
-        ? (mate !== null
-            ? Math.max(0, Math.min(100, (score >= 0 ? score : 0) / 10))
-            : Math.max(5, Math.min(95, ((score / 100) + 4) / 8 * 100)))
-        : 50;
+        ?
+        Math.max(5, Math.min(95, (Nscore + 4) * 13))
+        : (mate !== null) ? ((trait === "w") ? 100 : 0) : 50;
 
+    console.log(props.fen, score, Nscore, normalizedScore);
     return (
         <div style={{ marginTop: 20 }}>
             {bestMove && (
@@ -54,21 +64,22 @@ const Bar: React.FC<BarProps> = (props) => {
                     <p><strong>Meilleur coup :</strong> {bestMove}</p>
                 </div>
             )}
-            <p><strong>Score :</strong> {score}</p>
+            <p><strong>Score :</strong> {Nscore}</p>
 
             <div style={{
                 display: "flex",
-                height: 350,
+                height: barHeight + 50, // laisse un peu de marge autour
                 width: "100%",
                 backgroundColor: "#eee",
                 borderRadius: 4,
                 overflow: "hidden",
-                marginTop: 8
+                marginTop: 8,
+                justifyContent: "center"
             }}>
                 <div style={{
-                    width: "40px",
+                    width: `${barWidth}px`,
+                    height: `${barHeight}px`,
                     borderRadius: '12px',
-                    height: "300px",
                     border: "1px solid black",
                     display: "flex",
                     flexDirection: "column"

@@ -7,7 +7,7 @@ import { connectDB, positions, users } from "./db"; // 🔗 MongoDB
 type FeuilleProps = {
     fen: string;
     commentaire: string;
-    childs: string[];
+    childs: number[];
 };
 
 const app = express();
@@ -45,14 +45,11 @@ app.post("/analyse", async (req, res) => {
                 score = trait === "b" ? -score : score;
             }
 
-            const normalizedScore = mate !== null
-                ? Math.max(0, Math.min(100, (score >= 0 ? score : 0) / 10))
-                : Math.max(5, Math.min(95, ((score / 100) + 4) / 8 * 100));
 
             const result = {
                 fen,
                 bestmove: matchMove ? matchMove[1] : null,
-                score: normalizedScore,
+                score: score,
                 mate: mate,
                 depth: depth || 15,
             };
@@ -78,6 +75,14 @@ app.post("/analyse", async (req, res) => {
 });
 
 // ------------------- API Utilisateurs -------------------
+function mapToObj(map: Map<any, any>): Record<string, any> {
+    return Object.fromEntries(
+        Array.from(map, ([key, value]) => [
+            String(key), // MongoDB impose des clés string
+            value instanceof Map ? mapToObj(value) : value,
+        ])
+    );
+}
 
 
 // Créer un utilisateur
@@ -85,7 +90,7 @@ app.post("/users", async (req, res) => {
     const { username, email } = req.body;
     const tree = new Map();
     console.log("Création de l'utilisateur :", username, email);
-    tree.set("root", {
+    tree.set(0, {
         fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      // position initiale
         commentaire: "",
         childs: [],
@@ -94,7 +99,7 @@ app.post("/users", async (req, res) => {
         username,
         email,
         createdAt: new Date(),
-        tree: tree,
+        tree: mapToObj(tree),
     };
     console.log("Nouvel utilisateur :", user);
     const result = await users.insertOne(user);
@@ -117,10 +122,11 @@ app.get("/users/:username", async (req, res) => {
 
 // Récupérer une position par son FEN
 app.get("/positions/:fen", async (req, res) => {
+    console.log("e", req.params.fen, 'e');
     try {
         const fen = decodeURIComponent(req.params.fen);
         console.log("Recherche position FEN :", fen);
-        const pos = await users.findOne({ fen: fen });
+        const pos = await positions.findOne({ fen: fen });
         if (!pos) {
             return res.status(404).json({ error: "position introuvable" });
         }
@@ -140,6 +146,7 @@ app.get("/users", async (req, res) => {
 
 // ------------------- API Récupération Positions -------------------
 app.get("/positions", async (req, res) => {
+
     const all = await positions.find().toArray();
     res.json(all);
 });

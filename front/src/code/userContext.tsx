@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 interface User {
   username: string;
   email: string;
-  [key: string]: any;
+  tree: { [key: number]: any };
 }
 
 interface UserContextType {

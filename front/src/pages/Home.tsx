@@ -10,7 +10,7 @@ export default function Home() {
                 <p>Analysez vos parties et créez vos études personnelles.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
                     <Link className="chess-btn" to="/analyse">Aller à l'analyse</Link>
-                    <Link className="chess-btn" to="/etudes">Voir les études</Link>
+                    <Link className="chess-btn" to="/arbre">Voir les études</Link>
                     <Link className="chess-btn" to="/echiquier">Échiquier</Link>
                 </div>
             </div>

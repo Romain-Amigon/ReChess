@@ -13,7 +13,7 @@ type HistoriqueProps = {
     coups: Coup[];
 };
 function getPieceSymbol(piece: string) {
-    console.log("eee", piece);
+    //console.log("eee", piece);
     switch (piece.toLowerCase()) {
         case "p": return "♟"; // pion
         case "r": return "♜"; // tour

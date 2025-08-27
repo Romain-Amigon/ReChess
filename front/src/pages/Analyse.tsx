@@ -68,11 +68,12 @@ export function Analyse() {
                 dernierCoup
             ]);
             setCurrentMoveIndex(prev => prev + 1); // avancer l’index
+            console.log("aaa", dernierCoup);
         }
     }, [dernierCoup]);
     return (
         <div className="chess-bg">
-            <div className="chess-container" style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 32 }}>
+            <div className="chess-container" style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
                 <div style={{ flex: 1 }}>
                     <h1 className="chess-title">Analyse/Import de partie</h1>
                     <textarea
@@ -84,14 +85,24 @@ export function Analyse() {
                     />
                     <button className="chess-btn" onClick={importPGN} style={{ marginBottom: 24 }}>Importer le PGN</button>
                     <div className="chessboard-wrapper" style={{ marginTop: 8 }}>
-                        <div style={{ position: "relative", left: "5%", marginTop: 8 }}>FEN : {game.fen()}</div>
-                        <Echiquier key={boardKey} position={game.fen()} onMove={setDernierCoup} />
+                        {/* Ligne du FEN seule */}
+                        <div style={{ marginBottom: 8 }}>FEN : {game.fen()}</div>
+
+                        {/* Flex Echiquier + Bar */}
+                        <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 20 }}>
+                            <Echiquier key={boardKey} position={game.fen()} onMove={setDernierCoup} />
+                            <div style={{ flex: "0 0 200px" }}>
+                                <Bar fen={game.fen()} depth={15} />
+                            </div>
+                        </div>
                     </div>
+
+
                 </div>
+
             </div>
-            <div >
-                <Bar fen={game.fen()} depth={12} />
-            </div>
+
+
             <div className="historique">
                 <Historique coups={moveHistory} />
             </div>
