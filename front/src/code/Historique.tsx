@@ -38,7 +38,7 @@ const Historique: React.FC<HistoriqueProps> = ({ coups }) => {
 
     return (
         <div>
-            <h3 style={{ marginTop: 0, marginBottom: 12, textAlign: 'center' }}>Historique des coups</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 12, textAlign: 'center' }}>History</h3>
             <div style={{ display: "flex", justifyContent: "center" }}>
 
                 <ol start={0} style={{ marginRight: 20 }}>

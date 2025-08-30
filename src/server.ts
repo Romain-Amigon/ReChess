@@ -3,6 +3,8 @@ import cors from "cors";
 import { spawn } from "child_process";
 import { join } from "path";
 import { connectDB, positions, users } from "./db"; // 🔗 MongoDB
+import bcrypt from "bcrypt";
+
 
 type FeuilleProps = {
     fen: string;
@@ -64,6 +66,8 @@ app.post("/analyse", async (req, res) => {
                 { upsert: true }
             );
 
+            console.log(result)
+
             res.json(result);
         }
     });
@@ -89,7 +93,7 @@ function mapToObj(map: Map<any, any>): Record<string, any> {
 app.post("/users", async (req, res) => {
     const { username, email } = req.body;
     const tree = new Map();
-    console.log("Création de l'utilisateur :", username, email);
+    console.log("Création de l'utilisateur :", username);//, email
     tree.set(0, {
         fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",      // position initiale
         commentaire: "",
@@ -97,7 +101,7 @@ app.post("/users", async (req, res) => {
     } as FeuilleProps);
     const user = {
         username,
-        email,
+        //email,
         createdAt: new Date(),
         tree: mapToObj(tree),
     };
@@ -149,10 +153,10 @@ app.patch("/users/:username", async (req, res) => {
 
 // Récupérer une position par son FEN
 app.get("/positions/:fen", async (req, res) => {
-    console.log("e", req.params.fen, 'e');
+    //console.log("e", req.params.fen, 'e');
     try {
         const fen = decodeURIComponent(req.params.fen);
-        console.log("Recherche position FEN :", fen);
+        //console.log("Recherche position FEN :", fen);
         const pos = await positions.findOne({ fen: fen });
         if (!pos) {
             return res.status(404).json({ error: "position introuvable" });
@@ -176,6 +180,73 @@ app.get("/positions", async (req, res) => {
 
     const all = await positions.find().toArray();
     res.json(all);
+});
+
+// ------------------- AUTHENTIFICATION -------------------
+
+// Inscription avec mot de passe hashé
+app.post("/register", async (req, res) => {
+    const { username, password } = req.body;//, email
+
+    if (!username || !password) {//|| !email 
+        return res.status(400).json({ error: "Champs manquants" });
+    }
+
+    // Vérifier si username déjà utilisé
+    const existing = await users.findOne({ username });
+    if (existing) {
+        return res.status(400).json({ error: "Ce pseudo est déjà pris" });
+    }
+
+
+
+    // Hacher le mot de passe
+    const hash = await bcrypt.hash(password, 10);
+
+    // Arbre par défaut
+    const tree = {
+        "0": {
+            fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            commentaire: "",
+            childs: [],
+        }
+    };
+
+    const user = {
+        username,
+        //email,
+        passwordHash: hash,
+        createdAt: new Date(),
+        tree,
+    };
+
+    await users.insertOne(user);
+    res.status(201).json({ message: "Utilisateur créé avec succès" });
+});
+
+// Connexion
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    const user = await users.findOne({ username });
+    if (!user) {
+        return res.status(400).json({ error: "Utilisateur introuvable" });
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+        return res.status(400).json({ error: "Mot de passe incorrect" });
+    }
+
+    res.json({
+        message: "Connexion réussie",
+        user: {
+            username: user.username,
+            //email: user.email,
+            createdAt: user.createdAt,
+            tree: user.tree,
+        }
+    });
 });
 
 

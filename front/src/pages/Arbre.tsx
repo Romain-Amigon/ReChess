@@ -6,7 +6,6 @@ import { Chess } from "chess.js";
 import type { PieceDropHandlerArgs } from "react-chessboard";
 import Echiquier from "../code/echiquier";
 
-
 type TreeNode = {
     fen: string;
     commentaire: string;
@@ -29,20 +28,21 @@ type TreeNodeProps = {
     node: TreeNode;
     tree: TreeMap;
     openModal: (parentKey: number, parentFen: string) => void;
+    deleteNode: (nodeKey: number) => void;
     updateComment?: (nodeKey: number, newComment: string) => void;
     ischild: boolean;
-    registerRect?: (rect: DOMRect) => void; // 👈 callback vers le parent
+    isparent: boolean;
+    registerRect?: (rect: DOMRect) => void;
+    onSelectNode: (nodeKey: number) => void; // 👈 nouvelle prop
 };
 
 function CurveLine({ from, to }: { from: DOMRect; to: DOMRect }) {
-    const x1 = from.right; // côté droit du parent
+    const x1 = from.right;
     const y1 = from.top + from.height / 2;
-    const x2 = to.left; // côté gauche de l’enfant
+    const x2 = to.left;
     const y2 = to.top + to.height / 2;
-    console.log("Drawing line from", { x1, y1 }, "to", { to, x2, y2 });
     const midX = (x1 + x2) / 2;
     const pathData = `M ${x1},${y1} C ${midX},${y1} ${midX},${y2} ${x2},${y2}`;
-
     return <path d={pathData} stroke="black" strokeWidth={2} fill="none" />;
 }
 
@@ -52,8 +52,11 @@ function TreeNodeComponent({
     tree,
     openModal,
     updateComment,
+    deleteNode,
     ischild,
+    isparent,
     registerRect,
+    onSelectNode,
 }: TreeNodeProps) {
     const [pos, setPos] = useState<Position | null>(null);
     const [comment, setComment] = useState(node.commentaire);
@@ -66,7 +69,6 @@ function TreeNodeComponent({
         if (nodeRef.current) {
             const rect = nodeRef.current.getBoundingClientRect();
             setParentRect(rect);
-            // informer le parent si besoin
             if (registerRect) registerRect(rect);
         }
     }, [nodeRef.current]);
@@ -96,14 +98,30 @@ function TreeNodeComponent({
     };
 
     return (
-        <div style={{ marginBottom: "20px", display: "flex", flexDirection: "row", alignItems: "center" }}>
+        <div
+            style={{
+                marginBottom: "20px",
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+        >
             {/* Bloc du noeud */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div
                     ref={nodeRef}
                     style={{
-                        display: "flex", flexDirection: "row", alignItems: "center", gap: "10px",
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: "10px",
+                        border: "2px solid transparent",
+                        padding: "5px",
+                        borderRadius: "5px",
+                        cursor: "pointer",
                     }}
+                    onClick={() => ischild && onSelectNode(nodeKey)} // 👈 sélection du noeud
                 >
                     <h3 style={{ margin: 0 }}>{nodeKey}</h3>
 
@@ -127,13 +145,37 @@ function TreeNodeComponent({
                             <p>⏳...</p>
                         )}
                     </div>
-
-                    <button
-                        onClick={() => openModal(nodeKey, node.fen)}
-                        style={{ padding: "5px 10px", cursor: "pointer", marginLeft: 10 }}
+                    <div
+                        style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: 10,
+                        }}
                     >
-                        +
-                    </button>
+                        <div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation(); // pour ne pas sélectionner en même temps
+                                    openModal(nodeKey, node.fen);
+                                }}
+                                style={{ padding: "5px 10px", cursor: "pointer", marginLeft: 10 }}
+                            >
+                                +
+                            </button>
+                        </div>
+                        {ischild && (!isparent) && <div>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteNode(nodeKey);
+                                }}
+                                style={{ padding: "5px 10px", cursor: "pointer", marginLeft: 10 }}
+                            >
+                                x
+                            </button>
+                        </div>}
+                    </div>
                 </div>
 
                 <div style={{ marginBottom: "10px" }}>
@@ -150,56 +192,59 @@ function TreeNodeComponent({
                     />
                 </div>
             </div>
-            {/* Rendu des enfants */}
-            {
-                !ischild && (
-                    <div
-                        style={{
-                            display: "flex", flexDirection: "column", alignItems: "center", marginLeft: "100px",
-                        }}
-                    >
-                        {node.childs.map((childKey) => {
-                            const child = tree.get(childKey);
-                            return child ? (
-                                <TreeNodeComponent
-                                    key={childKey}
-                                    nodeKey={childKey}
-                                    node={child}
-                                    tree={tree}
-                                    openModal={openModal}
-                                    updateComment={updateComment}
-                                    ischild={true}
-                                    registerRect={(rect) =>
-                                        setChildRects((prev) => [...prev, rect])
-                                    }
-                                />
-                            ) : null;
-                        })}
-                    </div>
-                )
-            }
 
-            {/* SVG pour les lignes */}
-            {
-                parentRect && childRects.length > 0 && (
-                    <svg
-                        style={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            width: "100%",
-                            height: "20000%",
-                            zIndex: 0,
-                            pointerEvents: "none",
-                        }}
-                    >
-                        {childRects.map((rect, idx) => (
-                            <CurveLine key={idx} from={parentRect} to={rect} />
-                        ))}
-                    </svg>
-                )
-            }
-        </div >
+            {/* Enfants */}
+            {!ischild && (
+                <div
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        marginLeft: "100px",
+                    }}
+                >
+                    {node.childs.map((childKey) => {
+                        const child = tree.get(childKey);
+                        return child ? (
+                            <TreeNodeComponent
+                                key={childKey}
+                                nodeKey={childKey}
+                                node={child}
+                                tree={tree}
+                                openModal={openModal}
+                                deleteNode={deleteNode}
+                                updateComment={updateComment}
+                                ischild={true}
+                                isparent={false}
+                                onSelectNode={onSelectNode}
+                                registerRect={(rect) =>
+                                    setChildRects((prev) => [...prev, rect])
+                                }
+                            />
+                        ) : null;
+                    })}
+                </div>
+            )}
+
+            {/* Lignes */}
+            {parentRect && childRects.length > 0 && (
+                <svg
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: "20000%",
+                        zIndex: 0,
+                        pointerEvents: "none",
+                    }}
+                >
+                    {childRects.map((rect, idx) => (
+                        <CurveLine key={idx} from={parentRect} to={rect} />
+                    ))}
+                </svg>
+            )}
+        </div>
     );
 }
 
@@ -211,6 +256,9 @@ export default function Arbre() {
     const [chess, setChess] = useState<any>(new Chess());
     const [fen, setFen] = useState("start");
     const [currentNodeKey, setCurrentNodeKey] = useState<number>(0);
+    const [parents, setParents] = useState<number[]>([]);
+    const [loading, setLoading] = useState(false);
+
 
     useEffect(() => {
         if (user?.tree) {
@@ -221,29 +269,58 @@ export default function Arbre() {
         }
     }, [user]);
 
-    // Fonction pour synchroniser l'arbre avec le serveur
+    const handleSelectNode = (nodeKey: number) => {
+        setParents([...parents, currentNodeKey]); // on empile le parent
+        console.log(parents)
+        setCurrentNodeKey(nodeKey);
+    };
+
+    const goBack = () => {
+        if (parents.length === 0) return;
+        const newParents = [...parents];
+        const lastParent = newParents.pop()!;
+        setParents(newParents);
+        setCurrentNodeKey(lastParent);
+    };
+
     const syncTreeWithServer = async (updatedTree: TreeMap) => {
         if (!user) return;
-
         try {
             const response = await fetch(`http://localhost:4000/users/${user.username}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tree: Object.fromEntries(updatedTree) }), // Convertir Map en objet
+                body: JSON.stringify({ tree: Object.fromEntries(updatedTree) }),
             });
-
-            if (!response.ok) {
-                throw new Error("Erreur lors de la mise à jour de l'arbre sur le serveur");
-            }
-
+            if (!response.ok) throw new Error("Erreur MAJ serveur");
             const updatedUser = await response.json();
-            // Mettre à jour l'utilisateur dans le contexte
-            updateUser(updatedUser); // Assurez-vous que setUser est accessible (voir Étape 3)
+            updateUser(updatedUser);
             localStorage.setItem("user", JSON.stringify(updatedUser));
-            console.log("Arbre synchronisé avec le serveur :", updatedTree);
         } catch (error) {
-            console.error("Erreur lors de la synchronisation de l'arbre :", error);
+            console.error("Erreur sync arbre :", error);
         }
+    };
+
+    const deleteNode = (nodeKey: number) => {
+        if (!userTree.has(nodeKey)) return;
+        const updatedTree = new Map(userTree);
+
+        updatedTree.forEach((node, key) => {
+            if (node.childs.includes(nodeKey)) {
+                node.childs = node.childs.filter((child) => child !== nodeKey);
+                updatedTree.set(key, node);
+            }
+        });
+
+        const deleteRecursively = (key: number) => {
+            const target = updatedTree.get(key);
+            if (!target) return;
+            for (const child of target.childs) deleteRecursively(child);
+            updatedTree.delete(key);
+        };
+        deleteRecursively(nodeKey);
+
+        setUserTree(updatedTree);
+        syncTreeWithServer(updatedTree);
     };
 
     const openModal = (parentKey: number, parentFen: string) => {
@@ -251,7 +328,6 @@ export default function Arbre() {
         setChess(game);
         setFen(parentFen);
         setModalParent(parentKey);
-        console.log("Ouverture modal pour parent :", parentKey);
         setModalOpen(true);
     };
 
@@ -260,52 +336,47 @@ export default function Arbre() {
         setModalParent(null);
     };
 
-    const handleDrop = ({ sourceSquare, targetSquare, piece }: PieceDropHandlerArgs): boolean => {
+    const handleDrop = ({ sourceSquare, targetSquare }: PieceDropHandlerArgs): boolean => {
         if (!targetSquare) return false;
-
         const gameCopy = new Chess(chess.fen());
         const move = gameCopy.move({
             from: sourceSquare,
             to: targetSquare,
             promotion: "q",
         });
-
         if (move) {
             setChess(gameCopy);
             setFen(gameCopy.fen());
             return true;
         }
-
         return false;
     };
 
     const validateMove = async () => {
-        if (modalParent == null) return;
+        if (modalParent == null || loading) return; // 🚫 si déjà en cours, on bloque
+        setLoading(true); // ✅ on bloque le bouton
 
         const newKey = Math.max(...Array.from(userTree.keys())) + 1;
         const parentNode = userTree.get(modalParent);
-        if (!parentNode) return;
+        if (!parentNode) {
+            setLoading(false);
+            return;
+        }
 
-        const newNode: TreeNode = {
-            fen: fen,
-            commentaire: "",
-            childs: [],
-        };
-
+        const newNode: TreeNode = { fen, commentaire: "", childs: [] };
         try {
             const res = await fetch(`http://localhost:4000/positions/${encodeURIComponent(fen)}`);
+            console.log(res, res.ok);
             if (!res.ok) {
                 await fetch("http://localhost:4000/analyse", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ fen, depth: 15 }),
+                    body: JSON.stringify({ fen, depth: 25 }),
                 });
-                console.log("Position analysée et insérée :", fen);
-            } else {
-                console.log("Position déjà présente dans la BDD :", fen);
             }
         } catch (e) {
-            console.error("Erreur lors de la vérification ou analyse de la position :", e);
+            console.error("Erreur analyse :", e);
+            setLoading(false);
             return;
         }
 
@@ -314,12 +385,12 @@ export default function Arbre() {
         parentNode.childs.push(newKey);
         updatedTree.set(modalParent, parentNode);
         setUserTree(updatedTree);
-
-        // Synchroniser l'arbre avec le serveur
         await syncTreeWithServer(updatedTree);
 
+        setLoading(false);
         closeModal();
     };
+
 
     const updateComment = (nodeKey: number, newComment: string) => {
         const updatedTree = new Map(userTree);
@@ -328,40 +399,141 @@ export default function Arbre() {
             node.commentaire = newComment;
             updatedTree.set(nodeKey, node);
             setUserTree(updatedTree);
-
-            // Synchroniser l'arbre avec le serveur
             syncTreeWithServer(updatedTree);
         }
+    };
+
+    const exportTree = () => {
+        if (!userTree) return;
+        const dataStr = JSON.stringify(Object.fromEntries(userTree), null, 2); // joliment formaté
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "chess_tree.json";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+
+
+    const importTree = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const json = JSON.parse(e.target?.result as string) as Record<number, TreeNode>;
+
+                // 1️⃣ Calculer la clé de départ pour le nouvel arbre
+                const existingKeys = Array.from(userTree.keys());
+                const maxKey = existingKeys.length > 0 ? Math.max(...existingKeys) : 0;
+                let keyOffset = maxKey + 1;
+
+                const oldToNewKeyMap = new Map<number, number>();
+
+                Object.entries(json).map(([key, node]) => {
+                    const oldKey = Number(key);
+                    const newKey = keyOffset++;
+                    oldToNewKeyMap.set(oldKey, newKey);
+                });
+
+                // 2️⃣ Créer le nouvel arbre avec clés décalées
+                const newTreeEntries: [number, TreeNode][] = Object.entries(json).map(([key, node]) => {
+
+                    // mettre à jour les enfants avec les nouvelles clés
+                    const newChilds = node.childs.map((childKey) => oldToNewKeyMap.get(childKey) || childKey);
+                    const newKey = oldToNewKeyMap.get(Number(key));
+                    if (newKey === undefined) throw new Error("Clé introuvable dans oldToNewKeyMap");
+                    return [newKey, { fen: node.fen, commentaire: node.commentaire, childs: newChilds } as TreeNode];
+                });
+
+                const newTree = new Map(userTree); // on clone l'arbre existant
+                newTreeEntries.forEach(([key, node]) => newTree.set(key, node));
+
+                // 3️⃣ Fusionner la racine : ajouter les enfants importés à la racine existante (clé 0)
+                const importedRootKey = oldToNewKeyMap.get(0); // racine de l'import
+                if (importedRootKey !== undefined && newTree.has(0)) {
+                    const rootNode = newTree.get(0)!;
+                    rootNode.childs.push(...newTree.get(importedRootKey)!.childs);
+                    newTree.set(0, rootNode);
+                }
+
+                setUserTree(newTree);
+                syncTreeWithServer(newTree);
+            } catch (err) {
+                alert("Error import !");
+                console.error(err);
+            }
+        };
+
+        reader.readAsText(file);
+    };
+
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImportClick = () => {
+        fileInputRef.current?.click(); // ouvre la boîte de dialogue
     };
 
     return (
         <div>
             {user ? (
                 <div>
-                    <h2>Bienvenue {user.username} 👋</h2>
-                    <p>{user.email}</p>
-                    <div>
-                        <h3>Votre arbre de parties :</h3>
+                    <h2>Welcome {user.username} 👋</h2>
+                    <div style={{ marginBottom: 20, gap: 30 }}>
+                        <button onClick={exportTree}>Exporter l’arbre</button>
+                        <button onClick={handleImportClick}>Importer l’arbre</button>
+                        {/* input caché */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".json"
+                            onChange={importTree}
+                            style={{ display: "none" }}
+                        />
+                    </div>
 
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+
+                        {parents.length > 0 && <div style={{ marginBottom: 10 }}>
+                            <TreeNodeComponent
+                                key={parents[parents.length - 1]}
+                                nodeKey={parents[parents.length - 1]}
+                                node={userTree.get(parents[parents.length - 1])!}
+                                tree={userTree}
+                                openModal={openModal}
+                                deleteNode={deleteNode}
+                                updateComment={updateComment}
+                                ischild={true}
+                                isparent={true}
+                                onSelectNode={goBack} // 👈 ajout
+                            />
+                        </div>}
                         {userTree.size > 0 ? (
-
                             <TreeNodeComponent
                                 key={currentNodeKey}
                                 nodeKey={currentNodeKey}
                                 node={userTree.get(currentNodeKey)!}
                                 tree={userTree}
                                 openModal={openModal}
+                                deleteNode={deleteNode}
                                 updateComment={updateComment}
                                 ischild={false}
+                                isparent={false}
+                                onSelectNode={handleSelectNode} // 👈 ajout
                             />
-
                         ) : (
-                            <p>Aucun arbre trouvé.</p>
+                            <p>
+                                No trees found.</p>
                         )}
                     </div>
                 </div>
             ) : (
-                <p>⚠️ Veuillez vous connecter pour voir l'arbre.</p>
+                <p>Please log in to view the tree.</p>
             )}
 
             {modalOpen && (
@@ -390,24 +562,17 @@ export default function Arbre() {
                             <Echiquier
                                 position={fen}
                                 onMove={(coup) => {
-                                    // mettre à jour le jeu temporaire dans la modal
                                     const gameCopy = new Chess(fen);
                                     gameCopy.move({ from: coup.from, to: coup.to, promotion: "q" });
                                     setFen(gameCopy.fen());
                                 }}
                             />
-
-                            {/* <Chessboard
-                            <Chessboard
-                                options={{
-                                    position: fen,
-                                    onPieceDrop: handleDrop, // 👈 ici dans options
-                                }}
-                            />*/}
-
                         </div>
                         <div style={{ marginTop: "10px", display: "flex", gap: "10px" }}>
-                            <button onClick={validateMove}>Valider</button>
+                            <button onClick={validateMove} disabled={loading}>
+                                {loading ? "Analyse=ys..." : "Validate"}
+                            </button>
+
                             <button onClick={closeModal}>Annuler</button>
                         </div>
                     </div>

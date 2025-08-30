@@ -6,12 +6,11 @@ export default function Home() {
     return (
         <div className="chess-bg">
             <div className="chess-container">
-                <h1 className="chess-title">Bienvenue sur Chess Study</h1>
-                <p>Analysez vos parties et créez vos études personnelles.</p>
+                <h1 className="chess-title">ReChess</h1>
+                <p>Analyze your games and create your personal studies.</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
-                    <Link className="chess-btn" to="/analyse">Aller à l'analyse</Link>
-                    <Link className="chess-btn" to="/arbre">Voir les études</Link>
-                    <Link className="chess-btn" to="/echiquier">Échiquier</Link>
+                    <Link className="chess-btn" to="/analysis">Analysis game</Link>
+                    <Link className="chess-btn" to="/tree">Search tree</Link>
                 </div>
             </div>
         </div>

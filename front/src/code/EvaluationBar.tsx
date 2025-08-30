@@ -5,15 +5,15 @@ type BarProps =
     | { score: number; fen?: undefined; depth?: undefined; width?: number; height?: number }; // mode score direct
 
 const Bar: React.FC<BarProps> = (props) => {
-    console.log("creation Bar", props);
+    //console.log("creation Bar", props);
     const [bestMove, setBestMove] = useState<string | null>(null);
     const [score, setScore] = useState<number | null>(
         "score" in props && props.score !== undefined ? props.score : null
     );
     const [mate, setMate] = useState<number | null>(null);
     const trait = props.fen ? props.fen.split(" ")[1] : "w"; // par défaut blanc
-    const barWidth = props.width ?? 40;   // largeur personnalisable
-    const barHeight = props.height ?? 300; // hauteur personnalisable
+    const barWidth = props.width ?? 40;
+    const barHeight = props.height ?? 300;
 
     const analyze = async (fen: string, depth: number) => {
         try {
@@ -40,7 +40,11 @@ const Bar: React.FC<BarProps> = (props) => {
     };
 
 
-
+    useEffect(() => {
+        if (props.fen && props.depth) {
+            analyze(props.fen, props.depth);
+        }
+    }, [props.fen, props.depth]);
 
     const Nscore = score !== null
         ? (score) / 100
@@ -51,21 +55,20 @@ const Bar: React.FC<BarProps> = (props) => {
         Math.max(5, Math.min(95, (Nscore + 4) * 13))
         : (mate !== null) ? ((trait === "w") ? 100 : 0) : 50;
 
-    console.log(props.fen, score, Nscore, normalizedScore);
+    //console.log(props.fen, score, Nscore, normalizedScore);
     return (
         <div style={{ marginTop: 20 }}>
             {bestMove && (
                 <div>
-                    <p><strong>Meilleur coup :</strong> {bestMove}</p>
+                    <p><strong>Best move :</strong> {bestMove}</p>
                 </div>
             )}
-            <p><strong>Score :</strong> {Nscore}</p>
+            <p><strong>Score :</strong> {mate ? "M" + mate : Nscore}</p>
 
             <div style={{
                 display: "flex",
-                height: barHeight + 50, // laisse un peu de marge autour
+                height: barHeight + 20,
                 width: "100%",
-                backgroundColor: "#eee",
                 borderRadius: 4,
                 overflow: "hidden",
                 marginTop: 8,
