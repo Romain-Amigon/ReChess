@@ -7,6 +7,7 @@
 librairies :
 
 back-end :
+
     -bcrypt
     -express 
     -cors
@@ -46,3 +47,7 @@ It's possible to import/export a tree to share it
 Also, you can import and analysis a game.
 
 ![Home](assets/game.png)
+
+## Databases
+
+![Home](assets/db.png)
