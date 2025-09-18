@@ -32,14 +32,15 @@ launch :
 
 ![Home](assets/home.png)
 
-The main feature is to create his own search tree with personnals comments. It's save in the user database as a json 
+The main feature is the ability to create your own search tree with personal comments.
+It is saved in the user database as a JSON object:
 {id_leaf : [fen:string, commentaire : string, childs [id_leaf_childs]  ]}
 
 ![Home](assets/tree.png)
 
-To optimize, if the score position is already in the database you get it directly else stockfish calculates the score and save in the database.
+To optimize performance, if the score for a position already exists in the database, it is retrieved directly; otherwise Stockfish calculates the score and saves it in the database.
 
-It's possible to import/export a tree to share it
+It is also possible to import or export a tree to share it.
 
 ![Home](assets/new.png)
 
