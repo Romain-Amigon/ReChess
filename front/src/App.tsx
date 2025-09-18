@@ -61,7 +61,6 @@ function AppContent() {
           display: "flex",
           alignItems: "center",
           borderBottom: "1px solid #ddd",
-          left: "50px"
         }}
       >
         <div style={{ flexGrow: 1 }}>
@@ -144,6 +143,7 @@ function AppContent() {
           <Route path="/analysis" element={<Analyse />} />
           <Route path="/tree" element={<Arbre />} />
           <Route path="/cv" element={<CV />} />
+          <Route path="/test" element={<Test />} />
         </Routes>
       </main>
 

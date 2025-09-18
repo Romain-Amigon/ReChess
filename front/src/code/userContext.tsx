@@ -34,7 +34,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!res.ok) throw new Error("Nom d’utilisateur ou mot de passe incorrect");
     const data = await res.json();
     setUser(data);
-    console.log(data);
+    //console.log(data);
     localStorage.setItem("user", JSON.stringify(data.user));
   };
 

@@ -1,5 +1,5 @@
 {
-  "name": "echecs2",
+  "name": "TreeChess",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {

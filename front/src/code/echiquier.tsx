@@ -9,9 +9,10 @@ const PROMOTION_PIECES: PieceSymbol[] = ["q", "r", "b", "n"];
 type EchiquierProps = {
     position?: string;
     onMove?: (coup: Coup) => void;
+    BoardSize?: number;
 };
 
-const Echiquier: React.FC<EchiquierProps> = React.memo(({ position, onMove }) => {
+const Echiquier: React.FC<EchiquierProps> = React.memo(({ position, onMove, BoardSize }) => {
     const chessGameRef = useRef(new Chess(position));
     const [chessPosition, setChessPosition] = useState(position || chessGameRef.current.fen());
     const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>(
@@ -22,7 +23,7 @@ const Echiquier: React.FC<EchiquierProps> = React.memo(({ position, onMove }) =>
     const [promotionMove, setPromotionMove] = useState<Omit<PieceDropHandlerArgs, 'piece'> | null>(null);
     const [checkKingSquare, setCheckKingSquare] = useState('');
     const calcBoardSize = () => Math.floor(window.innerWidth * 0.3);
-    const [boardSize, setBoardSize] = useState(calcBoardSize);
+    const [boardSize, setBoardSize] = useState(BoardSize ? BoardSize : calcBoardSize);
     const moveSound = useRef<HTMLAudioElement | null>(null);
 
     // Sauvegarder boardOrientation dans localStorage

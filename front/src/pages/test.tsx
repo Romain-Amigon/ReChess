@@ -1,15 +1,17 @@
 import React, { useState } from "react";
 import Bar from "../code/EvaluationBar";
+import Engine from "../code/engine";
 
+import EngineAnalysis from "../code/Evaluation";
 const Test: React.FC = () => {
-    const [fen, setFen] = useState("r1bqkbnr/pppppppp/n7/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 2 2");
+    const [fen, setFen] = useState("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     const [depth, setDepth] = useState(15);
     const [bestMove, setBestMove] = useState<string | null>(null);
     const [score, setScore] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
 
 
-
+    const [engine, setEngine] = useState(new Engine);
     // Normalisation du score pour l'affichage (max ±10)
     const normalizedScore = score ? Math.max(5, Math.min(95, ((score ? score / 100 : 100) + 4) / 8 * 100)) : 0;
 
@@ -36,7 +38,8 @@ const Test: React.FC = () => {
             {(
                 <div style={{ marginTop: 20 }}>
 
-                    <Bar fen={fen} depth={depth} />
+                    <Bar fen={fen} depth={22} />
+
 
                 </div>
 

@@ -5,6 +5,7 @@ import Bar from "../code/EvaluationBar";
 import { Chess } from "chess.js";
 import type { PieceDropHandlerArgs } from "react-chessboard";
 import Echiquier from "../code/echiquier";
+import Engine from "../code/engine";
 
 type TreeNode = {
     fen: string;
@@ -19,7 +20,6 @@ type Position = {
     score: number;
     mate: number | null;
     bestmove: string | null;
-    playCount: number;
     depth: number;
 };
 
@@ -271,7 +271,7 @@ export default function Arbre() {
 
     const handleSelectNode = (nodeKey: number) => {
         setParents([...parents, currentNodeKey]); // on empile le parent
-        console.log(parents)
+        //console.log(parents)
         setCurrentNodeKey(nodeKey);
     };
 
@@ -352,9 +352,76 @@ export default function Arbre() {
         return false;
     };
 
+    const engineRef = useRef<Engine | null>(null);
+
+    const savePosition = async (fen: string, score: number, bestMove: string | null, depth: number, mate: number | null) => {
+        console.log("save", bestMove)
+        try {
+            await fetch("http://localhost:4000/analyse", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fen, bestMove, score, mate, depth }),
+            });
+        } catch (err) {
+            console.error("Erreur lors de l'enregistrement en BDD:", err);
+        }
+    };
+
+    const latestData = useRef<{ score: number | null; bestMove: string | null; mate: number | null }>({
+        score: null,
+        bestMove: null,
+        mate: null,
+    });
+
+    async function analyze(fen: string, depth: number): Promise<Position> {
+        const position: Position = { fen, score: 0, mate: null, bestmove: null, depth };
+        if (!engineRef.current) engineRef.current = new Engine();
+        const engine = engineRef.current;
+
+        const trait = fen.split(" ")[1];
+
+        return new Promise((resolve, reject) => {
+            // Timeout pour éviter que la promesse reste bloquée indéfiniment
+            const timeout = setTimeout(() => {
+                engine.stop();
+                reject(new Error("Timeout: l'engine n'a pas répondu dans les 30 secondes"));
+            }, 60000); // 15secondes max
+
+            const listener = ({ positionEvaluation, bestMove, possibleMate }: {
+                positionEvaluation?: string;
+                bestMove?: string;
+                possibleMate?: string
+            }) => {
+                if (positionEvaluation) {
+                    const evalCp = Number(positionEvaluation);
+                    position.score = trait === "w" ? evalCp : -evalCp;
+                }
+
+                if (possibleMate) {
+                    position.mate = Number(possibleMate);
+                    position.score = trait === "w" ? 1000 : -1000;
+                }
+
+                // ⚡️ n'enregistre PAS encore, juste garde les données
+                if (bestMove) {
+                    position.bestmove = bestMove;
+
+                    // 👉 ici seulement on résout
+                    clearTimeout(timeout);
+                    engine.stop();
+                    resolve(position);
+                }
+            };
+
+
+            engine.onMessage(listener);
+            engine.evaluatePosition(fen, depth);
+        });
+    }
+
     const validateMove = async () => {
-        if (modalParent == null || loading) return; // 🚫 si déjà en cours, on bloque
-        setLoading(true); // ✅ on bloque le bouton
+        if (modalParent == null || loading) return;
+        setLoading(true);
 
         const newKey = Math.max(...Array.from(userTree.keys())) + 1;
         const parentNode = userTree.get(modalParent);
@@ -363,22 +430,25 @@ export default function Arbre() {
             return;
         }
 
+
         const newNode: TreeNode = { fen, commentaire: "", childs: [] };
+
         try {
             const res = await fetch(`http://localhost:4000/positions/${encodeURIComponent(fen)}`);
-            console.log(res, res.ok);
             if (!res.ok) {
-                await fetch("http://localhost:4000/analyse", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ fen, depth: 25 }),
-                });
+                console.log("n'existe pas");
+
+                const position = await analyze(fen, 40);
+                await savePosition(fen, position.score, position.bestmove, position.depth, position.mate);
             }
         } catch (e) {
             console.error("Erreur analyse :", e);
             setLoading(false);
             return;
         }
+
+
+
 
         const updatedTree = new Map(userTree);
         updatedTree.set(newKey, newNode);
@@ -485,8 +555,8 @@ export default function Arbre() {
                 <div>
                     <h2>Welcome {user.username} 👋</h2>
                     <div style={{ marginBottom: 20, gap: 30 }}>
-                        <button onClick={exportTree}>Exporter l’arbre</button>
-                        <button onClick={handleImportClick}>Importer l’arbre</button>
+                        <button onClick={exportTree}>Export tree</button>
+                        <button onClick={handleImportClick}>Import tree</button>
                         {/* input caché */}
                         <input
                             ref={fileInputRef}
@@ -557,7 +627,6 @@ export default function Arbre() {
                             borderRadius: "8px",
                         }}
                     >
-                        <h3>Nouvelle variante</h3>
                         <div style={{ width: 400, height: 400 }}>
                             <Echiquier
                                 position={fen}
@@ -566,11 +635,12 @@ export default function Arbre() {
                                     gameCopy.move({ from: coup.from, to: coup.to, promotion: "q" });
                                     setFen(gameCopy.fen());
                                 }}
+                                BoardSize={350}
                             />
                         </div>
                         <div style={{ marginTop: "10px", display: "flex", gap: "10px" }}>
                             <button onClick={validateMove} disabled={loading}>
-                                {loading ? "Analyse=ys..." : "Validate"}
+                                {loading ? "Analysis..." : "Validate"}
                             </button>
 
                             <button onClick={closeModal}>Annuler</button>

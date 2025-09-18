@@ -125,7 +125,7 @@ export function Analyse() {
                         <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 20 }}>
                             <Echiquier key={boardKey} position={game.fen()} onMove={setDernierCoup} />
                             <div style={{ flex: "0 0 200px" }}>
-                                <Bar fen={game.fen()} depth={20} />
+                                <Bar fen={game.fen()} depth={25} />
                             </div>
                         </div>
 

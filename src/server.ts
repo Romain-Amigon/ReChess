@@ -18,64 +18,31 @@ app.use(express.json());
 
 // ------------------- API Analyse avec Stockfish -------------------
 app.post("/analyse", async (req, res) => {
-    const { fen, depth } = req.body;
-    const engine = spawn(join(__dirname, "../public/stockfish.exe"));
+    const { fen, bestMove, score, mate, depth } = req.body;
 
-    let output = "";
-    engine.stdout.on("data", async (data) => {
-        output += data.toString();
+    console.log('e', bestMove);
+    const result = {
+        fen,
+        bestmove: bestMove,
+        score: score,
+        mate: mate,
+        depth: depth || 15,
+    };
 
-        if (output.includes("bestmove")) {
-            const matchMove = output.match(/bestmove\s+(\S+)/);
-            const matchCp = output.match(/score\s+cp\s+(-?\d+)/);
-            const matchMate = output.match(/score\s+mate\s+(-?\d+)/);
+    // 🔥 Sauvegarde dans Mongo avec compteur
+    await positions.updateOne(
+        { fen },
+        {
+            $set: result,
+        },
+        { upsert: true }
+    );
 
-            engine.kill();
+    console.log(result)
 
-            const trait = fen.split(" ")[1]; // "w" ou "b"
-
-            let score = matchCp ? parseInt(matchCp[1], 10) : 50;
-            let mate = matchMate ? parseInt(matchMate[1], 10) : null;
-
-            if (mate !== null) {
-                if (mate > 0) {
-                    score = trait === "w" ? 1000 : -1000;
-                } else {
-                    score = trait === "w" ? -1000 : 1000;
-                }
-            } else {
-                score = trait === "b" ? -score : score;
-            }
+    res.json(result);
 
 
-            const result = {
-                fen,
-                bestmove: matchMove ? matchMove[1] : null,
-                score: score,
-                mate: mate,
-                depth: depth || 15,
-            };
-
-            // 🔥 Sauvegarde dans Mongo avec compteur
-            await positions.updateOne(
-                { fen },
-                {
-                    $set: result,
-                    $inc: { playCount: 1 } // incrémente playCount
-                },
-                { upsert: true }
-            );
-
-            console.log(result)
-
-            res.json(result);
-        }
-    });
-
-    engine.stdin.write("uci\n");
-    engine.stdin.write("ucinewgame\n");
-    engine.stdin.write(`position fen ${fen}\n`);
-    engine.stdin.write(`go depth ${depth || 15}\n`);
 });
 
 // ------------------- API Utilisateurs -------------------

@@ -1,48 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+import Engine from "./engine";
 
-const analyze = async (fen: string, depth: number) => {
-    try {
-        var res = await fetch(`http://localhost:4000/positions/${encodeURIComponent(fen)}`);
-        if (!res.ok) {
-            console.log("pas trouve")
-            res = await fetch("http://localhost:4000/analyse", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ fen, depth }),
-            });
-        }
-        const data = await res.json();
-        const trait = fen.split(" ")[1];
-        var score = 50;
-        //console.log(data);
-
-        if (data.mate !== null) {
-            score = trait === "w" ? 10 : -10;
-            if (data.mate <= 0) {
-                score = -score;
-            }
-
-
-
-        } else {
-
-            score = data.score !== null
-                ? (data.score) / 100
-                : (data.mate !== null) ? data.mate : 0;
-
-
-            score = Math.round(score * 100) / 100;
-        }
-        //console.log(score, data.score);
-
-        score = Math.max(-10, score);
-        score = Math.min(10, score);
-        return score
-    } catch (err) {
-        console.error(err);
-        return 50;
-    }
+type Position = {
+    fen: string;
+    score: number;
+    mate: number | null;
+    bestmove: string | null;
+    depth: number;
 };
 
 interface EvaluationGraphProps {
@@ -53,71 +18,148 @@ const EvaluationGraph: React.FC<EvaluationGraphProps> = ({ fens }) => {
     const [data, setData] = useState<{ move: number; eval: number }[]>([]);
     const [whiteAccuracy, setWhiteAccuracy] = useState<number | null>(null);
     const [blackAccuracy, setBlackAccuracy] = useState<number | null>(null);
+    const fenCache = useRef<Map<string, Position>>(new Map()); // Cache for FEN evaluations
+    const engineRef = useRef<Engine | null>(null);
 
     useEffect(() => {
         if (fens.length === 0) return;
 
         const runAnalysis = async () => {
-            const results: { move: number; eval: number }[] = [];
-
-            for (let i = 0; i < fens.length; i++) {
-                const score = await analyze(fens[i], 25);
-                results.push({ move: i + 1, eval: score });
+            // Initialize engine once
+            if (!engineRef.current) {
+                engineRef.current = new Engine();
             }
 
-            setData(results);
+            const newData: { move: number; eval: number }[] = [...data];
 
-            // --- calcul précision simple ---
-            let whiteLoss = 0, blackLoss = 0, whiteMoves = 0, blackMoves = 0;
+            // Only analyze new FENs
+            for (let i = data.length; i < fens.length; i++) {
+                const fen = fens[i];
+                let position: Position;
 
-            for (let i = 1; i < results.length; i++) {
-                const prevEval = results[i - 1].eval;
-                const currentEval = results[i].eval;
+                // Check cache first
+                if (fenCache.current.has(fen)) {
+                    position = fenCache.current.get(fen)!;
+                } else {
+                    position = await analyze(fen, 25);
+                    fenCache.current.set(fen, position); // Cache the result
+                }
 
-                const diff = (currentEval < prevEval) ? prevEval - currentEval : 0;
+                newData.push({ move: i + 1, eval: position.score });
+            }
 
+            setData(newData);
 
-                //console.log(diff);
-                if (i % 2 === 1) { // Blanc joue aux coups impairs
+            // Calculate accuracies
+            let whiteLoss = 0,
+                blackLoss = 0,
+                whiteMoves = 0,
+                blackMoves = 0;
+
+            for (let i = 1; i < newData.length; i++) {
+                const prevEval = newData[i - 1].eval;
+                const currentEval = newData[i].eval;
+                const diff = currentEval < prevEval ? prevEval - currentEval : 0;
+
+                if (i % 2 === 1) {
+                    // White's move (odd indices)
                     whiteLoss += diff;
                     whiteMoves++;
                 } else {
+                    // Black's move (even indices)
                     blackLoss += diff;
                     blackMoves++;
                 }
             }
 
-            const whiteAcc = 100 * (1 - (whiteLoss / (whiteMoves)));
-            const blackAcc = 100 * ((blackLoss / (blackMoves)));
+            const whiteAcc = whiteMoves > 0 ? 100 * (1 - whiteLoss / whiteMoves) : 100;
+            const blackAcc = blackMoves > 0 ? 100 * (1 - blackLoss / blackMoves) : 100;
 
             setWhiteAccuracy(whiteAcc);
             setBlackAccuracy(blackAcc);
         };
 
         runAnalysis();
+
+        // Cleanup engine on component unmount
+        return () => {
+            if (engineRef.current) {
+                engineRef.current.stop();
+                engineRef.current = null;
+            }
+        };
     }, [fens]);
+
+    async function analyze(fen: string, depth: number): Promise<Position> {
+        const engine = engineRef.current!;
+        const trait = fen.split(" ")[1];
+
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                engine.stop();
+                reject(new Error("Timeout: l'engine n'a pas répondu dans les 60 secondes"));
+            }, 60000);
+
+            let lastScore = 0;
+            let lastMate: number | null = null;
+
+            const listener = ({
+                positionEvaluation,
+                bestMove,
+                possibleMate,
+            }: {
+                positionEvaluation?: string;
+                bestMove?: string;
+                possibleMate?: string;
+            }) => {
+                if (positionEvaluation !== undefined) {
+                    const evalCp = Number(positionEvaluation);
+                    lastScore = trait === "w" ? evalCp : -evalCp;
+                }
+
+                if (possibleMate !== undefined) {
+                    lastMate = Number(possibleMate);
+                    lastScore = trait === "w" ? 1000 : -1000;
+                }
+
+                if (bestMove) {
+                    clearTimeout(timeout);
+                    engine.stop();
+
+                    resolve({
+                        fen,
+                        score: lastScore / 100,
+                        mate: lastMate,
+                        bestmove: bestMove,
+                        depth,
+                    });
+                }
+            };
+
+            engine.onMessage(listener);
+            engine.evaluatePosition(fen, depth);
+        });
+    }
 
     return (
         <div>
             <div style={{ width: "100%", height: 300, display: "flex", flexDirection: "row" }}>
-
                 <div style={{ marginTop: 20 }}>
-                    <h2>game analysis</h2>
-                    <p>Précision Blancs : {whiteAccuracy?.toFixed(1)}%</p>
-                    <p>Précision Noirs : {blackAccuracy?.toFixed(1)}%</p>
+                    <h2>Game Analysis</h2>
+                    <p>White Accuracy: {whiteAccuracy?.toFixed(1)}%</p>
+                    <p>Black Accuracy: {blackAccuracy?.toFixed(1)}%</p>
                 </div>
                 <div style={{ width: "100%" }}>
                     <ResponsiveContainer>
                         <LineChart data={data}>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="move" label={{ value: "Coup", position: "insideBottom", offset: -5 }} />
-                            <YAxis domain={[-2, 2]} label={{ value: "Évaluation", angle: -90, position: "insideLeft" }} />
+                            <XAxis dataKey="move" label={{ value: "Move", position: "insideBottom", offset: -5 }} />
+                            <YAxis domain={[-2, 2]} label={{ value: "Evaluation", angle: -90, position: "insideLeft" }} />
                             <Tooltip />
                             <Line type="monotone" dataKey="eval" stroke="#007bff" dot={false} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
-
             </div>
         </div>
     );
