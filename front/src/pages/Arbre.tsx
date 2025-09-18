@@ -33,7 +33,7 @@ type TreeNodeProps = {
     ischild: boolean;
     isparent: boolean;
     registerRect?: (rect: DOMRect) => void;
-    onSelectNode: (nodeKey: number) => void; // 👈 nouvelle prop
+    onSelectNode: (nodeKey: number) => void; //  nouvelle prop
 };
 
 function CurveLine({ from, to }: { from: DOMRect; to: DOMRect }) {
@@ -182,7 +182,7 @@ function TreeNodeComponent({
                     <textarea
                         value={comment}
                         onChange={handleCommentChange}
-                        placeholder="Ajouter un commentaire..."
+                        placeholder="comment..."
                         style={{
                             width: "100%",
                             maxWidth: "480px",
@@ -402,11 +402,11 @@ export default function Arbre() {
                     position.score = trait === "w" ? 1000 : -1000;
                 }
 
-                // ⚡️ n'enregistre PAS encore, juste garde les données
+                //  n'enregistre PAS encore, juste garde les données
                 if (bestMove) {
                     position.bestmove = bestMove;
 
-                    // 👉 ici seulement on résout
+                    //  ici seulement on résout
                     clearTimeout(timeout);
                     engine.stop();
                     resolve(position);
@@ -580,7 +580,7 @@ export default function Arbre() {
                                 updateComment={updateComment}
                                 ischild={true}
                                 isparent={true}
-                                onSelectNode={goBack} // 👈 ajout
+                                onSelectNode={goBack} //  ajout
                             />
                         </div>}
                         {userTree.size > 0 ? (
@@ -594,7 +594,7 @@ export default function Arbre() {
                                 updateComment={updateComment}
                                 ischild={false}
                                 isparent={false}
-                                onSelectNode={handleSelectNode} // 👈 ajout
+                                onSelectNode={handleSelectNode} //ajout
                             />
                         ) : (
                             <p>
